@@ -48,6 +48,27 @@ const COLLECTIONS_QUERY = `
   }
 `;
 
+type CollectionData = {
+  collection: { id: string; title: string } | null;
+};
+
+const COLLECTION_QUERY = `
+  query Collection($id: ID!) {
+    collection(id: $id) {
+      id
+      title
+    }
+  }
+`;
+
+// Returns null when the collection doesn't exist.
+export async function getCollection(id: string) {
+  const { collection } = await shopifyQuery<CollectionData>(COLLECTION_QUERY, {
+    id,
+  });
+  return collection;
+}
+
 export async function getCollections(cursor: string | null) {
   const { collections } = await shopifyQuery<CollectionsData>(
     COLLECTIONS_QUERY,
