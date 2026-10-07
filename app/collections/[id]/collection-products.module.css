@@ -1,0 +1,31 @@
+/* Keeps the page content clear of the fixed sidebar. */
+.withSidebar {
+  padding-right: 18rem;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18rem;
+  overflow-y: auto;
+  background: var(--p-color-bg-surface);
+  border-left: var(--p-border-width-025) solid var(--p-color-border);
+}
+
+/* Small screens have no room beside the products, so the sidebar sits above
+   them instead. */
+@media (max-width: 47.9975em) {
+  .withSidebar {
+    padding-right: 0;
+  }
+
+  .sidebar {
+    position: static;
+    width: auto;
+    min-height: 12rem;
+    margin-bottom: var(--p-space-400);
+    border: var(--p-border-width-025) solid var(--p-color-border);
+  }
+}
