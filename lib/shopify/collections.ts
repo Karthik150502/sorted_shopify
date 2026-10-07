@@ -1,4 +1,8 @@
-import { shopifyQuery } from "@/lib/shopify/graphql";
+import {
+  shopifyMutation,
+  shopifyQuery,
+  type UserError,
+} from "@/lib/shopify/graphql";
 
 const PAGE_SIZE = 20;
 
@@ -89,4 +93,50 @@ export async function getCollections(cursor: string | null) {
       ? collections.pageInfo.endCursor
       : null,
   };
+}
+
+type CollectionSortOrderData = {
+  collection: { sortOrder: string } | null;
+};
+
+type CollectionUpdateData = {
+  collectionUpdate: { userErrors: UserError[] } | null;
+};
+
+const COLLECTION_SORT_ORDER_QUERY = `
+  query CollectionSortOrder($id: ID!) {
+    collection(id: $id) {
+      sortOrder
+    }
+  }
+`;
+
+const SET_MANUAL_SORT_ORDER_MUTATION = `
+  mutation SetManualSortOrder($id: ID!) {
+    collectionUpdate(input: { id: $id, sortOrder: MANUAL }) {
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+// Shopify only keeps a hand-picked product order on collections sorted
+// manually, so this switches the collection to manual sorting if needed.
+// Returns false when the collection doesn't exist.
+export async function ensureManualSortOrder(id: string) {
+  const { collection } = await shopifyQuery<CollectionSortOrderData>(
+    COLLECTION_SORT_ORDER_QUERY,
+    { id },
+  );
+  if (!collection) return false;
+
+  if (collection.sortOrder !== "MANUAL") {
+    await shopifyMutation<CollectionUpdateData>(
+      SET_MANUAL_SORT_ORDER_MUTATION,
+      { id },
+    );
+  }
+  return true;
 }

@@ -2,6 +2,7 @@ import "server-only";
 import "@shopify/shopify-api/adapters/web-api";
 import { ApiVersion, Session, shopifyApi } from "@shopify/shopify-api";
 import { env } from "@/constants/env";
+import { getAccessToken } from "@/lib/shopify/access-token";
 
 type Variables = Record<string, unknown>;
 
@@ -30,20 +31,19 @@ function createShopify() {
 }
 
 let shopify: ReturnType<typeof createShopify> | undefined;
-let session: Session | undefined;
 
 async function request<TData>(operation: string, variables?: Variables) {
   shopify ??= createShopify();
 
-  // Client-credentials tokens expire after 24 hours, so fetch a new one when
-  // there is none yet or the current one is within a minute of expiring.
-  if (!session || session.isExpired(60_000)) {
-    ({ session } = await shopify.auth.clientCredentials({
+  const client = new shopify.clients.Graphql({
+    session: new Session({
+      id: `offline_${env.SHOPIFY_STORE_DOMAIN}`,
       shop: env.SHOPIFY_STORE_DOMAIN,
-    }));
-  }
-
-  const client = new shopify.clients.Graphql({ session });
+      state: "",
+      isOnline: false,
+      accessToken: await getAccessToken(),
+    }),
+  });
   // Retries cover 429 and 5xx responses; other failures throw a ShopifyError.
   const { data } = await client.request<TData>(operation, {
     variables,
