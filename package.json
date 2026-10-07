@@ -1,0 +1,33 @@
+{
+  "name": "sorted",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@shopify/polaris": "^13.9.5",
+    "@shopify/polaris-icons": "^9.3.1",
+    "@shopify/shopify-api": "^15.0.0",
+    "@tanstack/react-query": "^5.104.1",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
