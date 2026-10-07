@@ -18,9 +18,11 @@ import {
   ProductGrid,
   type ProductGridChanges,
 } from "@/components/ProductGrid";
+import { SortRules } from "@/components/SortRules";
 import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import type { Product } from "@/lib/shopify/products";
+import { DEFAULT_RULES } from "@/lib/types";
 import styles from "./collection-products.module.css";
 
 const GRID_COLUMNS = { xs: 2, sm: 3, lg: 4, xl: 5 };
@@ -29,6 +31,7 @@ export function CollectionProducts() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rules, setRules] = useState(DEFAULT_RULES);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   // Changing the key remounts the grid, which discards its unsaved changes.
@@ -81,6 +84,7 @@ export function CollectionProducts() {
   function leaveWithoutSaving() {
     setLeaveModalOpen(false);
     setGridKey((key) => key + 1);
+    setRules(DEFAULT_RULES);
     router.push("/collections");
   }
 
@@ -101,7 +105,11 @@ export function CollectionProducts() {
           },
         ]}
       >
-        {sidebarOpen && <aside className={styles.sidebar} />}
+        {sidebarOpen && (
+          <aside className={styles.sidebar}>
+            <SortRules rules={rules} onChange={setRules} />
+          </aside>
+        )}
         <BlockStack gap="400">
           {error && (
             <Banner
@@ -150,9 +158,10 @@ export function CollectionProducts() {
                 key={gridKey}
                 products={items}
                 pinnedIds={pins.data}
+                rules={rules}
                 saving={saving}
                 onSave={save}
-                onReset={() => {}}
+                onReset={() => setRules(DEFAULT_RULES)}
                 onUnsavedChange={setHasUnsavedChanges}
               />
             </InfiniteScroll>
