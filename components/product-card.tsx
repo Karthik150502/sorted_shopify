@@ -18,7 +18,7 @@ const STATUS_BADGES = {
   UNLISTED: { tone: undefined, label: "Unlisted" },
 } as const;
 
-function formatPrice({ min, max, currencyCode }: Product["price"]) {
+export function formatPrice({ min, max, currencyCode }: Product["price"]) {
   const price = new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currencyCode,

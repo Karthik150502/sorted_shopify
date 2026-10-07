@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Banner,
   BlockStack,
@@ -9,10 +9,16 @@ import {
   EmptyState,
   InlineGrid,
   Page,
+  Text,
 } from "@shopify/polaris";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { InfiniteScroll } from "@/components/infinite-scroll";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
-import { useApiQuery } from "@/hooks/use-api";
+import { ProductCardSkeleton } from "@/components/product-card";
+import {
+  ProductGrid,
+  type ProductGridChanges,
+} from "@/components/ProductGrid";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import type { Product } from "@/lib/shopify/products";
 import styles from "./collection-products.module.css";
@@ -21,18 +27,73 @@ const GRID_COLUMNS = { xs: 2, sm: 3, lg: 4, xl: 5 };
 
 export function CollectionProducts() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  // Changing the key remounts the grid, which discards its unsaved changes.
+  const [gridKey, setGridKey] = useState(0);
 
   const collection = useApiQuery<{ title: string }>(`/api/collections/${id}`);
+  const productsUrl = `/api/collections/${id}/products`;
   const { items, initialLoading, loading, hasMore, error, loadMore, retry } =
-    useInfiniteScroll<Product>(`/api/collections/${id}/products`);
+    useInfiniteScroll<Product>(productsUrl);
+  // A successful save refetches the products, so the grid shows what Shopify
+  // now has.
+  const saveOrder = useApiMutation<unknown, { productIds: string[] }>(
+    `/api/collections/${id}/order`,
+    [productsUrl],
+  );
+
+  const collectionGid = `gid://shopify/Collection/${id}`;
+  const pinsUrl = `/api/pins?collectionId=${encodeURIComponent(collectionGid)}`;
+  const pins = useApiQuery<string[]>(pinsUrl);
+  const savePins = useApiMutation<
+    unknown,
+    { collectionId: string; pinnedIds: string[] }
+  >("/api/pins", [pinsUrl]);
+
+  const saving = saveOrder.isPending || savePins.isPending;
+  const saveError = saveOrder.error ?? savePins.error;
+  const saved =
+    !saving && !saveError && (saveOrder.isSuccess || savePins.isSuccess);
+
+  // Order and pins are stored separately in Shopify, so only the part that
+  // changed is written.
+  function save({ products, pinnedIds }: ProductGridChanges) {
+    saveOrder.reset();
+    savePins.reset();
+    if (products) {
+      saveOrder.mutate({ productIds: products.map((product) => product.id) });
+    }
+    if (pinnedIds) {
+      savePins.mutate({ collectionId: collectionGid, pinnedIds });
+    }
+  }
+
+  function dismissSaveBanner() {
+    saveOrder.reset();
+    savePins.reset();
+  }
+
+  // Next.js keeps this page's state when navigating away, so the modal and
+  // the unsaved changes are cleared explicitly before leaving.
+  function leaveWithoutSaving() {
+    setLeaveModalOpen(false);
+    setGridKey((key) => key + 1);
+    router.push("/collections");
+  }
 
   return (
     <div className={sidebarOpen ? styles.withSidebar : undefined}>
       <Page
         fullWidth
         title={collection.data?.title ?? "Collection"}
-        backAction={{ content: "Collections", url: "/collections" }}
+        backAction={
+          hasUnsavedChanges
+            ? { content: "Collections", onAction: () => setLeaveModalOpen(true) }
+            : { content: "Collections", url: "/collections" }
+        }
         secondaryActions={[
           {
             content: sidebarOpen ? "Hide sidebar" : "Show sidebar",
@@ -51,6 +112,27 @@ export function CollectionProducts() {
               <p>{error.message}</p>
             </Banner>
           )}
+          {pins.error && (
+            <Banner title="Pinned products couldn't be loaded" tone="critical">
+              <p>{pins.error.message}</p>
+            </Banner>
+          )}
+          {saveError && (
+            <Banner
+              title="Changes couldn't be saved"
+              tone="critical"
+              onDismiss={dismissSaveBanner}
+            >
+              <p>{saveError.message}</p>
+            </Banner>
+          )}
+          {saved && (
+            <Banner
+              title="Changes saved"
+              tone="success"
+              onDismiss={dismissSaveBanner}
+            />
+          )}
           {initialLoading ? (
             <InlineGrid columns={GRID_COLUMNS} gap="400">
               {Array.from({ length: 10 }, (_, index) => (
@@ -64,11 +146,15 @@ export function CollectionProducts() {
               onLoadMore={loadMore}
               endMessage="You've reached the end of this collection."
             >
-              <InlineGrid columns={GRID_COLUMNS} gap="400">
-                {items.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </InlineGrid>
+              <ProductGrid
+                key={gridKey}
+                products={items}
+                pinnedIds={pins.data}
+                saving={saving}
+                onSave={save}
+                onReset={() => {}}
+                onUnsavedChange={setHasUnsavedChanges}
+              />
             </InfiniteScroll>
           ) : (
             !error && (
@@ -84,6 +170,15 @@ export function CollectionProducts() {
           )}
         </BlockStack>
       </Page>
+      <ConfirmModal
+        open={leaveModalOpen}
+        title="Unsaved changes"
+        confirmLabel="Yes"
+        onConfirm={leaveWithoutSaving}
+        onCancel={() => setLeaveModalOpen(false)}
+      >
+        <Text as="p">Exit page and don&apos;t save the reordered products?</Text>
+      </ConfirmModal>
     </div>
   );
 }
