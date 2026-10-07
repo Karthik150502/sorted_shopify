@@ -15,6 +15,8 @@ export type Product = {
   // Null when Shopify doesn't track inventory for the product.
   inventory: number | null;
   price: { min: string; max: string; currencyCode: string };
+  // ISO 8601 timestamp.
+  createdAt: string;
 };
 
 type CollectionProductsData = {
@@ -24,6 +26,7 @@ type CollectionProductsData = {
         id: string;
         title: string;
         status: Product["status"];
+        createdAt: string;
         tracksInventory: boolean;
         totalInventory: number;
         featuredMedia: {
@@ -48,6 +51,7 @@ const COLLECTION_PRODUCTS_QUERY = `
           id
           title
           status
+          createdAt
           tracksInventory
           totalInventory
           featuredMedia {
@@ -93,6 +97,7 @@ export async function getCollectionProducts(
     title: node.title,
     imageUrl: node.featuredMedia?.preview?.image?.url ?? null,
     status: node.status,
+    createdAt: node.createdAt,
     inventory: node.tracksInventory ? node.totalInventory : null,
     price: {
       min: node.priceRangeV2.minVariantPrice.amount,

@@ -33,7 +33,9 @@ import {
 } from "@shopify/polaris";
 import { ImageIcon, PinFilledIcon, PinIcon } from "@shopify/polaris-icons";
 import { formatPrice } from "@/components/product-card";
+import { applyRules } from "@/lib/applyRules";
 import type { Product } from "@/lib/shopify/products";
+import type { Rules } from "@/lib/types";
 import styles from "./product-card.module.css";
 
 // What a save needs to write; each part is present only if it changed.
@@ -46,6 +48,8 @@ type ProductGridProps = {
   products: Product[];
   // The saved pinned product IDs, or undefined until they have loaded.
   pinnedIds: string[] | undefined;
+  // Sorting rules; each change re-sorts the grid from the saved order.
+  rules: Rules;
   // True while a save is in progress.
   saving: boolean;
   onSave: (changes: ProductGridChanges) => void;
@@ -145,6 +149,7 @@ function SortableProductTile(props: ProductTileProps) {
 export function ProductGrid({
   products,
   pinnedIds,
+  rules,
   saving,
   onSave,
   onReset,
@@ -156,6 +161,7 @@ export function ProductGrid({
   // been toggled.
   const [pins, setPins] = useState<string[] | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [appliedRules, setAppliedRules] = useState(rules);
 
   const sensors = useSensors(
     // The small distance lets clicks on the pin button through without
@@ -197,6 +203,14 @@ export function ProductGrid({
     (pins.length !== pinnedIds.length ||
       pins.some((id) => !pinnedIds.includes(id)));
   const hasChanges = orderChanged || pinsChanged;
+
+  // A change to the rules sorts the saved order afresh, so the grid always
+  // reflects the current settings and turning them all off restores it.
+  // Earlier drags are replaced; products can be dragged again afterwards.
+  if (rules !== appliedRules) {
+    setAppliedRules(rules);
+    setOrder(applyRules(products, rules, currentPins).map((p) => p.id));
+  }
 
   useEffect(() => {
     onUnsavedChange(hasChanges);
