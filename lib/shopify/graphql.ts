@@ -1,6 +1,7 @@
 import "server-only";
 import "@shopify/shopify-api/adapters/web-api";
-import { ApiVersion, shopifyApi } from "@shopify/shopify-api";
+import { ApiVersion, Session, shopifyApi } from "@shopify/shopify-api";
+import { env } from "@/constants/env";
 
 type Variables = Record<string, unknown>;
 
@@ -18,36 +19,31 @@ export class ShopifyUserError extends Error {
   }
 }
 
-function createClient() {
-  const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-  const apiVersion = process.env.SHOPIFY_API_VERSION;
-
-  if (!storeDomain || !accessToken || !apiVersion) {
-    throw new Error(
-      "Missing Shopify configuration. Set SHOPIFY_STORE_DOMAIN, SHOPIFY_ADMIN_ACCESS_TOKEN and SHOPIFY_API_VERSION.",
-    );
-  }
-
-  const shopify = shopifyApi({
-    // Only used for OAuth and webhook verification, which this app doesn't do.
-    apiSecretKey: "unused",
-    adminApiAccessToken: accessToken,
-    apiVersion: apiVersion as ApiVersion,
-    hostName: storeDomain,
-    isCustomStoreApp: true,
+function createShopify() {
+  return shopifyApi({
+    apiKey: env.SHOPIFY_CLIENT_ID,
+    apiSecretKey: env.SHOPIFY_CLIENT_SECRET,
+    apiVersion: ApiVersion.October26,
+    hostName: env.SHOPIFY_STORE_DOMAIN,
     isEmbeddedApp: false,
-  });
-
-  return new shopify.clients.Graphql({
-    session: shopify.session.customAppSession(storeDomain),
   });
 }
 
-let client: ReturnType<typeof createClient> | undefined;
+let shopify: ReturnType<typeof createShopify> | undefined;
+let session: Session | undefined;
 
 async function request<TData>(operation: string, variables?: Variables) {
-  client ??= createClient();
+  shopify ??= createShopify();
+
+  // Client-credentials tokens expire after 24 hours, so fetch a new one when
+  // there is none yet or the current one is within a minute of expiring.
+  if (!session || session.isExpired(60_000)) {
+    ({ session } = await shopify.auth.clientCredentials({
+      shop: env.SHOPIFY_STORE_DOMAIN,
+    }));
+  }
+
+  const client = new shopify.clients.Graphql({ session });
   // Retries cover 429 and 5xx responses; other failures throw a ShopifyError.
   const { data } = await client.request<TData>(operation, {
     variables,
