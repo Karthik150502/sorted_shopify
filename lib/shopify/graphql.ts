@@ -24,7 +24,7 @@ function createShopify() {
   return shopifyApi({
     apiKey: env.SHOPIFY_CLIENT_ID,
     apiSecretKey: env.SHOPIFY_CLIENT_SECRET,
-    apiVersion: ApiVersion.October26,
+    apiVersion: env.SHOPIFY_API_VERSION as ApiVersion,
     hostName: env.SHOPIFY_STORE_DOMAIN,
     isEmbeddedApp: false,
   });
