@@ -1,4 +1,5 @@
 import { shopifyErrorResponse } from "@/lib/shopify/error-response";
+import { isShopifyId } from "@/lib/shopify/gid";
 import { ShopifyUserError } from "@/lib/shopify/graphql";
 import {
   MAX_REORDERED_PRODUCTS,
@@ -13,13 +14,16 @@ export async function POST(
   const body = await request.json().catch(() => null);
   const productIds: unknown = body?.productIds;
 
+  // Saving switches the collection to manual sorting before it reorders, so
+  // a malformed order is refused here, before anything in Shopify changes.
   if (
     !Array.isArray(productIds) ||
     productIds.length === 0 ||
-    !productIds.every((productId) => typeof productId === "string")
+    !productIds.every((productId) => isShopifyId(productId, "Product")) ||
+    new Set(productIds).size !== productIds.length
   ) {
     return Response.json(
-      { error: "No product order was provided." },
+      { error: "No valid product order was provided." },
       { status: 400 },
     );
   }

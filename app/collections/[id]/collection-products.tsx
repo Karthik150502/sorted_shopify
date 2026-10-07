@@ -62,15 +62,25 @@ export function CollectionProducts() {
     !saving && !saveError && (saveOrder.isSuccess || savePins.isSuccess);
 
   // Order and pins are stored separately in Shopify, so only the part that
-  // changed is written.
+  // changed is written. Pins are saved after the order, and only if it
+  // succeeded: saved pins decide what the grid treats as the saved order, so
+  // saving them alone would hide an order that failed to save.
   function save({ products, pinnedIds }: ProductGridChanges) {
     saveOrder.reset();
     savePins.reset();
+
+    const savePinsIfChanged = () => {
+      if (pinnedIds) {
+        savePins.mutate({ collectionId: collectionGid, pinnedIds });
+      }
+    };
     if (products) {
-      saveOrder.mutate({ productIds: products.map((product) => product.id) });
-    }
-    if (pinnedIds) {
-      savePins.mutate({ collectionId: collectionGid, pinnedIds });
+      saveOrder.mutate(
+        { productIds: products.map((product) => product.id) },
+        { onSuccess: savePinsIfChanged },
+      );
+    } else {
+      savePinsIfChanged();
     }
   }
 

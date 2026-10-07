@@ -1,4 +1,5 @@
 import { shopifyErrorResponse } from "@/lib/shopify/error-response";
+import { isShopifyId } from "@/lib/shopify/gid";
 import { ShopifyUserError } from "@/lib/shopify/graphql";
 import { getPinnedProductIds, setPinnedProductIds } from "@/lib/shopify/pins";
 
@@ -8,9 +9,9 @@ import { getPinnedProductIds, setPinnedProductIds } from "@/lib/shopify/pins";
 export async function GET(request: Request) {
   const collectionId = new URL(request.url).searchParams.get("collectionId");
 
-  if (!collectionId) {
+  if (!isShopifyId(collectionId, "Collection")) {
     return Response.json(
-      { error: "No collection was provided." },
+      { error: "No valid collection was provided." },
       { status: 400 },
     );
   }
@@ -38,10 +39,12 @@ export async function POST(request: Request) {
   const collectionId: unknown = body?.collectionId;
   const pinnedIds: unknown = body?.pinnedIds;
 
+  // The collection ID becomes the metafield's owner, so anything that isn't a
+  // collection is refused rather than written to.
   if (
-    typeof collectionId !== "string" ||
+    !isShopifyId(collectionId, "Collection") ||
     !Array.isArray(pinnedIds) ||
-    !pinnedIds.every((id) => typeof id === "string")
+    !pinnedIds.every((id) => isShopifyId(id, "Product"))
   ) {
     return Response.json(
       { error: "A collection and a list of pinned products are required." },
